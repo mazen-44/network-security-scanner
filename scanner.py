@@ -21,6 +21,8 @@ def scan_port(ip , port):
                         print("No banner received!")
                     else:
                         print(f"Banner : {data.decode()}")
+                except UnicodeDecodeError:
+                    print("Banner could not be decoded as text!")
                 except socket.timeout:
                     print("Banner connection timeout!")
             else:
