@@ -15,6 +15,16 @@ def scan_port(ip , port):
             result = sock.connect_ex((ip , i))
             if result == 0 :
                 print(f"The port {i} is open!")
+                try : 
+                    data = sock.recv(1024)
+                    if data == b'':
+                        print("No banner received!")
+                    else:
+                        print(f"Banner : {data.decode()}")
+                except socket.timeout:
+                    print("Banner connection timeout!")
+            else:
+                print(f"The port {i} is Closed!")
         except socket.timeout:
             print("Connection timeout!")
         finally:
