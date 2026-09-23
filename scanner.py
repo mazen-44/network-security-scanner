@@ -1,11 +1,25 @@
 import socket
 import argparse
+import requests
 def resolve_target(target) :
     try :
         ip = socket.gethostbyname(target)
         return ip
     except socket.gaierror:
         print("INVALID HOST NAME!")
+        return None
+def http_enum(ip , port):
+    if port == 80:
+        scheme = "http"
+    elif port == 443:
+        scheme = "https"
+    else:
+        return None
+    url = f"{scheme}://{ip}:{port}"
+    try:
+        response = requests.get(url , timeout=2)
+        return response
+    except requests.RequestException:
         return None
 def scan_port(ip , port):
     for i in port:
@@ -15,16 +29,25 @@ def scan_port(ip , port):
             result = sock.connect_ex((ip , i))
             if result == 0 :
                 print(f"The port {i} is open!")
-                try : 
-                    data = sock.recv(1024)
-                    if data == b'':
-                        print("No banner received!")
+                if i == 80 or i == 443:
+                    response = http_enum(ip, i)
+                    if response:
+                        print(f"Status : {response.status_code}")
+                        print(f"Server : {response.headers.get('Server' , 'Not disclosed')}")
+                        print(f"Content Type : {response.headers.get('Content-Type' , 'Not disclosed')}")
                     else:
-                        print(f"Banner : {data.decode()}")
-                except UnicodeDecodeError:
-                    print("Banner could not be decoded as text!")
-                except socket.timeout:
-                    print("Banner connection timeout!")
+                        print("HTTP request failed!")
+                else:
+                    try : 
+                        data = sock.recv(1024)
+                        if data == b'':
+                            print("No banner received!")
+                        else:
+                            print(f"Banner : {data.decode()}")
+                    except UnicodeDecodeError:
+                        print("Banner could not be decoded as text!")
+                    except socket.timeout:
+                        print("Banner connection timeout!")
             else:
                 print(f"The port {i} is Closed!")
         except socket.timeout:
