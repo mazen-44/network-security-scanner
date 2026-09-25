@@ -1,6 +1,8 @@
 import socket
 import argparse
 import requests
+import json
+import datetime
 def resolve_target(target) :
     try :
         ip = socket.gethostbyname(target)
@@ -22,19 +24,22 @@ def http_enum(ip , port):
     except requests.RequestException:
         return None
 def scan_port(ip , port):
+    result = []
     for i in port:
         sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
         sock.settimeout(2)
         try:
-            result = sock.connect_ex((ip , i))
-            if result == 0 :
-                print(f"The port {i} is open!")
+            connection_result = sock.connect_ex((ip , i))
+            if connection_result == 0 :
+                port_info = {"port": i, "status": "open", "banner": None, "http_status": None, "server": None}
                 if i == 80 or i == 443:
                     response = http_enum(ip, i)
                     if response:
                         print(f"Status : {response.status_code}")
                         print(f"Server : {response.headers.get('Server' , 'Not disclosed')}")
                         print(f"Content Type : {response.headers.get('Content-Type' , 'Not disclosed')}")
+                        port_info["http_status"] = response.status_code
+                        port_info["server"] = response.headers.get('Server' , 'Not disclosed')
                     else:
                         print("HTTP request failed!")
                 else:
@@ -44,16 +49,24 @@ def scan_port(ip , port):
                             print("No banner received!")
                         else:
                             print(f"Banner : {data.decode()}")
+                            port_info["banner"] = data.decode()
                     except UnicodeDecodeError:
                         print("Banner could not be decoded as text!")
                     except socket.timeout:
                         print("Banner connection timeout!")
+                result.append(port_info)
             else:
-                print(f"The port {i} is Closed!")
+                result.append(
+                    {
+                        "port" : i,
+                        "status" : "closed"
+                    }
+                )
         except socket.timeout:
             print("Connection timeout!")
         finally:
             sock.close()
+    return result
 def parse_ports(ports_str):
     if "-" in ports_str:
         ports = ports_str.split("-")
@@ -103,7 +116,19 @@ def main():
         return
     print(f"The IP of the host is : {ip}")
     port_list = parse_ports(args.ports)
+    t = datetime.datetime.now()
+    time = t.strftime("%Y-%m-%d | %H:%M:%S")
     if port_list:
-        scan_port(ip , port_list)
+        result = {
+            "target" : args.target,
+            "ip" : ip,
+            "ports" : [],
+            "timestamp" : time
+        }
+        ports = scan_port(ip,port_list)
+        result["ports"].extend(ports)
+        filename = f"reports/scan_{args.target}_{t.strftime('%Y%m%d_%H%M%S')}.json"
+        with open(filename,"w") as file:
+            json.dump(result, file , indent=4)
 if __name__ == "__main__":
     main()
